@@ -10,9 +10,11 @@ const App = () => {
   const [shortUrl, setshortUrl] = useState("");
   const [copied, setcopied] = useState(false);
   const [qrImage, setqrImage] = useState("");
+  const [loading, setloading] = useState(false);
 
   const handleShorten = async ()=>{
-    if(!url)return;
+    if(!url || loading)return;
+    setloading(true);
 
     try{
       const res = await axios.post(`${API_BASE_URL}/shortener`,{
@@ -29,6 +31,8 @@ const App = () => {
     } catch(err){
       console.log(err);
       alert(err.response?.data?.error || "Something went wrong");
+    }finally{
+      setloading(false);
     }
   }
 
@@ -52,6 +56,7 @@ const App = () => {
       <button
         onClick={handleShorten}
         className="btn btn-primary w-full sm:auto"
+        disabled={loading}
       >
         Shorten
       </button>
