@@ -1,2 +1,14 @@
 @import "tailwindcss";
 @plugin "daisyui";
+
+/* Reset browser-default blue focus outlines and enforce primary purple theme focus rings */
+@layer base {
+  input:focus,
+  button:focus,
+  a:focus,
+  input:focus-visible,
+  button:focus-visible,
+  a:focus-visible {
+    outline: none !important;
+  }
+}

@@ -1,28 +1,49 @@
-import express from 'express';
+import express from "express";
 import dotenv from "dotenv";
-import mongoose from 'mongoose';
 import cors from "cors";
-import urlRoutes from "./routes/url.js"
+import cookieParser from "cookie-parser";
+import connectDB from "./config/db.js";
+import urlRoutes from "./routes/url.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
+import errorHandler from "./middleware/errorHandler.middleware.js";
 
 dotenv.config();
 
 const app = express();
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  methods: ["GET","POST"]
-}));
+// --------------- Middleware ---------------
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  })
+);
 app.use(express.json());
+app.use(cookieParser());
 
-app.use("/",urlRoutes);
+// --------------- Routes ---------------
+// Auth API
+app.use("/api/auth", authRoutes);
 
-mongoose.connect(process.env.MONGO_URI)
-.then(()=>{
-  console.log("connected to mongoDB");
-  app.listen(process.env.PORT,()=>{
-    console.log(`Server is running on port ${process.env.PORT}`);
+// Dashboard API
+app.use("/api/dashboard", dashboardRoutes);
+
+// URL shortener API (create)
+app.use("/api", urlRoutes);
+
+// Short-URL redirect (must stay at root for short URLs to work)
+app.use("/", urlRoutes);
+
+// --------------- Error Handler ---------------
+app.use(errorHandler);
+
+// --------------- Start ---------------
+const PORT = process.env.PORT || 5000;
+
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
   });
-})
-.catch((err)=>{
-  console.log("Error connecting to MongoDB:",err);
 });
