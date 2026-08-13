@@ -11,6 +11,8 @@ export const validateEmailConfig = () => {
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REFRESH_TOKEN,
+    GMAIL_USER,
+    GMAIL_PASS,
     SMTP_HOST,
     SMTP_USER,
     SMTP_PASS,
@@ -18,11 +20,15 @@ export const validateEmailConfig = () => {
 
   if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
     console.log("📧 Email Service Mode: [Google OAuth 2.0 / Gmail API]");
+  } else if (GMAIL_USER && GMAIL_PASS) {
+    console.log(`📧 Email Service Mode: [Gmail App Password for ${GMAIL_USER}]`);
   } else if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
     console.log(`📧 Email Service Mode: [Standard SMTP Host: ${SMTP_HOST}]`);
+  } else if (SMTP_USER && SMTP_PASS && SMTP_USER.includes("@gmail.com")) {
+    console.log(`📧 Email Service Mode: [Gmail App Password for ${SMTP_USER}]`);
   } else {
     console.warn("⚠️ [Email Service Warning] Production email credentials missing!");
-    console.warn("   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, or GOOGLE_REFRESH_TOKEN is absent on Render.");
+    console.warn("   Neither Google OAuth 2.0 nor Gmail App Password nor custom SMTP is configured on Render.");
     console.warn("   Emails will fall back to Ethereal test SMTP (messages logged in console preview link).");
   }
 };
@@ -30,9 +36,10 @@ export const validateEmailConfig = () => {
 /**
  * Creates a reusable Nodemailer transporter.
  * Supports:
- * 1. Google OAuth 2.0 (Gmail)
- * 2. Standard SMTP (Gmail App Passwords, SendGrid, Mailgun, AWS SES)
- * 3. Ethereal Test Account fallback
+ * 1. Google OAuth 2.0 (Gmail API)
+ * 2. Gmail App Passwords (GMAIL_USER / GMAIL_PASS or SMTP_USER / SMTP_PASS)
+ * 3. Custom SMTP (SendGrid, Mailgun, AWS SES, Custom Host)
+ * 4. Ethereal Test Account fallback
  */
 const getTransporter = async () => {
   const {
@@ -40,6 +47,8 @@ const getTransporter = async () => {
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI,
     GOOGLE_REFRESH_TOKEN,
+    GMAIL_USER,
+    GMAIL_PASS,
     SMTP_HOST,
     SMTP_PORT,
     SMTP_USER,
@@ -76,8 +85,8 @@ const getTransporter = async () => {
         throw new Error("Failed to retrieve Google OAuth 2.0 access token.");
       }
 
-      // Extract raw email address from SMTP_FROM or fallback to SMTP_USER
-      let userEmail = SMTP_USER || "";
+      // Extract raw email address from SMTP_FROM or fallback to SMTP_USER / GMAIL_USER
+      let userEmail = GMAIL_USER || SMTP_USER || "";
       const rawFrom = SMTP_FROM || "";
       const match = rawFrom.match(/<([^>]+)>/);
       if (match) {
@@ -106,7 +115,21 @@ const getTransporter = async () => {
     }
   }
 
-  // 2. Standard SMTP Transport (Gmail App Passwords or Custom Provider)
+  // 2. Direct Gmail App Password Transport
+  const targetGmailUser = GMAIL_USER || (SMTP_USER && SMTP_USER.includes("@gmail.com") ? SMTP_USER : null);
+  const targetGmailPass = GMAIL_PASS || (SMTP_PASS && !SMTP_HOST ? SMTP_PASS : null);
+
+  if (targetGmailUser && targetGmailPass) {
+    return nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: targetGmailUser,
+        pass: targetGmailPass,
+      },
+    });
+  }
+
+  // 3. Custom Standard SMTP Transport (SendGrid, Mailgun, AWS SES, etc.)
   if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
     return nodemailer.createTransport({
       host: SMTP_HOST,
@@ -119,7 +142,7 @@ const getTransporter = async () => {
     });
   }
 
-  // 3. Fallback: Ethereal test transporter
+  // 4. Fallback: Ethereal test transporter
   if (!cachedEtherealTransporter) {
     try {
       console.log("📧 Creating Ethereal test SMTP transporter fallback...");
@@ -155,8 +178,10 @@ export const sendOtpEmail = async (to, otp, name) => {
   try {
     const mailer = await getTransporter();
 
+    const fromAddress = process.env.SMTP_FROM || process.env.GMAIL_USER || process.env.SMTP_USER || '"URL Shortener" <noreply@urlshortener.com>';
+
     const mailOptions = {
-      from: process.env.SMTP_FROM || '"URL Shortener" <noreply@urlshortener.com>',
+      from: fromAddress,
       to,
       subject: "Verify Your Email — URL Shortener",
       html: `
@@ -179,7 +204,7 @@ export const sendOtpEmail = async (to, otp, name) => {
 
     const info = await Promise.race([sendPromise, timeoutPromise]);
 
-    if (!process.env.GOOGLE_CLIENT_ID && info && typeof nodemailer.getTestMessageUrl === "function") {
+    if (!process.env.GOOGLE_CLIENT_ID && !process.env.GMAIL_PASS && info && typeof nodemailer.getTestMessageUrl === "function") {
       const previewUrl = nodemailer.getTestMessageUrl(info);
       if (previewUrl) {
         console.log(`📧 Ethereal Preview URL: ${previewUrl}`);

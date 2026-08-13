@@ -2,6 +2,22 @@ import Url from "../models/Url.js";
 import { nanoid } from "nanoid";
 
 /**
+ * Extracts and sanitizes the base URL for short link generation.
+ * Handles single URLs, comma-separated lists, or || separated strings in process.env.BASE_URL.
+ */
+const getCleanBaseUrl = () => {
+  const raw = process.env.BASE_URL || "";
+  const parts = raw
+    .split(/[,|]+/)
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+  // Prefer an HTTPS URL if available, otherwise take the last URL
+  const httpsUrl = parts.find((u) => u.startsWith("https://"));
+  return httpsUrl || parts[parts.length - 1] || "http://localhost:5000";
+};
+
+/**
  * POST /api/shortener
  * Creates a new short URL or returns an existing one if the original URL
  * has already been shortened.
@@ -25,10 +41,12 @@ export const createShortUrl = async (req, res, next) => {
       return res.status(400).json({ error: "Invalid URL format" });
     }
 
+    const baseUrl = getCleanBaseUrl();
+
     // Check if originalUrl already exists in database
     const existingUrl = await Url.findOne({ originalUrl });
     if (existingUrl) {
-      const shortUrl = `${process.env.BASE_URL}/${existingUrl.shortId}`;
+      const shortUrl = `${baseUrl}/${existingUrl.shortId}`;
       return res.status(200).json({ shortUrl });
     }
 
@@ -46,7 +64,7 @@ export const createShortUrl = async (req, res, next) => {
       owner: req.user?.id || null,
     });
 
-    const shortUrl = `${process.env.BASE_URL}/${shortId}`;
+    const shortUrl = `${baseUrl}/${shortId}`;
     return res.status(201).json({ shortUrl });
   } catch (err) {
     console.error("Error creating short URL:", err);
@@ -78,7 +96,7 @@ export const redirectToOriginal = async (req, res, next) => {
 
     return res.redirect(url.originalUrl);
   } catch (error) {
-    console.error("Error during redirect:", error);
+    console.error("Error during redirect:", error.message || error);
     next(error);
   }
 };

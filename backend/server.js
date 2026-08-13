@@ -14,8 +14,9 @@ dotenv.config();
 const app = express();
 
 // --------------- Robust CORS Configuration ---------------
+// Support single URLs, comma-separated URLs, or || separated URLs in env
 const allowedOrigins = (process.env.FRONTEND_URL || "")
-  .split(",")
+  .split(/[,|]+/)
   .map((url) => url.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
