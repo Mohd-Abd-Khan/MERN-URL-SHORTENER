@@ -357,3 +357,45 @@ export const getMe = async (req, res, next) => {
     next(error);
   }
 };
+
+// ─────────────────────────────────────────────
+//  POST /api/auth/resend-otp
+// ─────────────────────────────────────────────
+export const resendOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    console.log(`🔄 [Auth] Resend OTP request for: ${email || "unknown"}`);
+
+    if (!email) {
+      return res.status(400).json({ error: "Email address is required" });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(200).json({ message: "If this email is registered, a new code has been sent" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ error: "This email address is already verified. Please log in." });
+    }
+
+    // Generate new 6-digit OTP
+    const otp = generateOtp();
+    user.otpHash = hashOtp(otp);
+    user.otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    user.otpAttempts = 0;
+    await user.save();
+
+    console.log(`📧 [Auth] Dispatching new OTP code to: ${normalizedEmail}`);
+    sendOtpEmail(user.email, otp, user.name)
+      .then(() => console.log(`📧 [Auth] Resent OTP email successfully to: ${normalizedEmail}`))
+      .catch((mailErr) => console.error(`❌ [Auth] Resend OTP email failed for ${normalizedEmail}:`, mailErr.message || mailErr));
+
+    return res.status(200).json({ message: "A new 6-digit verification code has been sent to your email" });
+  } catch (error) {
+    console.error("❌ [Auth] Resend OTP Error:", error.message || error);
+    next(error);
+  }
+};

@@ -19,6 +19,15 @@ export const verifyOtpApi = async ({ email, otp }) => {
 };
 
 /**
+ * Resend 6-digit OTP verification code.
+ * @param {{ email: string }} data
+ */
+export const resendOtpApi = async ({ email }) => {
+  const res = await api.post("/api/auth/resend-otp", { email });
+  return res.data;
+};
+
+/**
  * Log in with email and password.
  * Returns { accessToken, user }.
  * @param {{ email: string, password: string }} data

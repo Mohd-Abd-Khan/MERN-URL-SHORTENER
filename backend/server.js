@@ -7,6 +7,7 @@ import urlRoutes from "./routes/url.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import errorHandler from "./middleware/errorHandler.middleware.js";
+import { validateEmailConfig } from "./utils/email.util.js";
 
 dotenv.config();
 
@@ -76,5 +77,6 @@ connectDB().then(() => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌐 Allowed CORS Origins:`, allowedOrigins);
     console.log(`🔗 Backend BASE_URL: ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
+    validateEmailConfig();
   });
 });

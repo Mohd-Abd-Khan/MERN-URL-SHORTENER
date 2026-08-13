@@ -4,9 +4,35 @@ import { OAuth2Client } from "google-auth-library";
 let cachedEtherealTransporter = null;
 
 /**
+ * Validates and logs server startup email environment readiness without exposing secret keys.
+ */
+export const validateEmailConfig = () => {
+  const {
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_REFRESH_TOKEN,
+    SMTP_HOST,
+    SMTP_USER,
+    SMTP_PASS,
+  } = process.env;
+
+  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
+    console.log("📧 Email Service Mode: [Google OAuth 2.0 / Gmail API]");
+  } else if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+    console.log(`📧 Email Service Mode: [Standard SMTP Host: ${SMTP_HOST}]`);
+  } else {
+    console.warn("⚠️ [Email Service Warning] Production email credentials missing!");
+    console.warn("   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, or GOOGLE_REFRESH_TOKEN is absent on Render.");
+    console.warn("   Emails will fall back to Ethereal test SMTP (messages logged in console preview link).");
+  }
+};
+
+/**
  * Creates a reusable Nodemailer transporter.
- * Uses Google OAuth 2.0 if configured in environment variables.
- * Falls back to a cached Ethereal test account or dummy transporter for local development.
+ * Supports:
+ * 1. Google OAuth 2.0 (Gmail)
+ * 2. Standard SMTP (Gmail App Passwords, SendGrid, Mailgun, AWS SES)
+ * 3. Ethereal Test Account fallback
  */
 const getTransporter = async () => {
   const {
@@ -14,10 +40,14 @@ const getTransporter = async () => {
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI,
     GOOGLE_REFRESH_TOKEN,
+    SMTP_HOST,
+    SMTP_PORT,
+    SMTP_USER,
+    SMTP_PASS,
     SMTP_FROM,
   } = process.env;
 
-  // If Google OAuth 2.0 credentials are present, use OAuth2 for Gmail
+  // 1. Google OAuth 2.0 Transport
   if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
     try {
       const redirectUri =
@@ -46,11 +76,14 @@ const getTransporter = async () => {
         throw new Error("Failed to retrieve Google OAuth 2.0 access token.");
       }
 
-      // Extract raw email address from SMTP_FROM
-      let userEmail = SMTP_FROM || "";
-      const match = userEmail.match(/<([^>]+)>/);
+      // Extract raw email address from SMTP_FROM or fallback to SMTP_USER
+      let userEmail = SMTP_USER || "";
+      const rawFrom = SMTP_FROM || "";
+      const match = rawFrom.match(/<([^>]+)>/);
       if (match) {
         userEmail = match[1];
+      } else if (rawFrom.includes("@")) {
+        userEmail = rawFrom.trim();
       }
 
       return nodemailer.createTransport({
@@ -66,17 +99,30 @@ const getTransporter = async () => {
       });
     } catch (err) {
       console.error(
-        "❌ [Email] Google OAuth 2.0 Failure:",
+        "❌ [Email] Google OAuth 2.0 Transport Failure:",
         err.message || "Unable to authenticate with Google OAuth 2.0"
       );
       throw err;
     }
   }
 
-  // Fallback: Re-use cached Ethereal test transporter to avoid repeated network calls
+  // 2. Standard SMTP Transport (Gmail App Passwords or Custom Provider)
+  if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+    return nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: parseInt(SMTP_PORT, 10) || 587,
+      secure: parseInt(SMTP_PORT, 10) === 465,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    });
+  }
+
+  // 3. Fallback: Ethereal test transporter
   if (!cachedEtherealTransporter) {
     try {
-      console.log("📧 Google OAuth credentials missing/incomplete. Creating Ethereal test SMTP transporter...");
+      console.log("📧 Creating Ethereal test SMTP transporter fallback...");
       const testAccount = await nodemailer.createTestAccount();
       cachedEtherealTransporter = nodemailer.createTransport({
         host: "smtp.ethereal.email",
@@ -90,7 +136,6 @@ const getTransporter = async () => {
       console.log(`📧 Ethereal test SMTP initialized for user: ${testAccount.user}`);
     } catch (etherealErr) {
       console.warn("⚠️ Failed to create Ethereal test account:", etherealErr.message);
-      // Failover JSON console transporter if Ethereal network fails
       cachedEtherealTransporter = nodemailer.createTransport({
         jsonTransport: true,
       });

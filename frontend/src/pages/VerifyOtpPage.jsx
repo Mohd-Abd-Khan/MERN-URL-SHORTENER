@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useLocation, useNavigate, Link, Navigate } from "react-router-dom";
-import { verifyOtpApi } from "../api/authApi";
+import { useLocation, useNavigate, Navigate } from "react-router-dom";
+import { verifyOtpApi, resendOtpApi } from "../api/authApi";
 import { useAuth } from "../context/useAuth";
 
 /**
@@ -18,6 +18,7 @@ const VerifyOtpPage = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   // Redirect already-authenticated users to /shorten
   if (!loading && user) {
@@ -55,6 +56,28 @@ const VerifyOtpPage = () => {
     }
   };
 
+  const handleResendOtp = async () => {
+    setError("");
+    setSuccess("");
+
+    if (!email.trim()) {
+      setError("Please enter your email address to resend code.");
+      return;
+    }
+
+    setIsResending(true);
+    try {
+      const res = await resendOtpApi({ email: email.trim() });
+      setSuccess(res.message || "A new 6-digit code has been sent to your email!");
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Failed to resend code. Please try again."
+      );
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6">
       <div className="card bg-base-200/80 backdrop-blur-md w-full max-w-md shadow-xl border border-base-300 rounded-2xl">
@@ -81,7 +104,7 @@ const VerifyOtpPage = () => {
 
           {success && (
             <div className="alert alert-success text-sm mb-4 p-3 rounded-lg flex items-center gap-2">
-              <span>✓ {success} Redirecting to login...</span>
+              <span>✓ {success}</span>
             </div>
           )}
 
@@ -173,12 +196,17 @@ const VerifyOtpPage = () => {
 
           <div className="divider text-xs text-base-content/50 my-4">OR</div>
 
-          <p className="text-center text-sm text-base-content/70">
-            Didn't receive a code?{" "}
-            <Link to="/register" className="link link-primary font-semibold hover:underline">
-              Re-register / Resend
-            </Link>
-          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-base-content/70">
+            <span>Didn't receive a code?</span>
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={isResending || isLoading}
+              className="btn btn-ghost btn-sm text-primary font-semibold hover:bg-primary/10"
+            >
+              {isResending ? "Resending..." : "Resend Code"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
