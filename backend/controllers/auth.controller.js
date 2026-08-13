@@ -276,7 +276,7 @@ export const refresh = async (req, res, next) => {
     const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
 
     if (!rawToken) {
-      return res.status(401).json({ error: "Authentication required" });
+      return res.status(200).json({ accessToken: null, user: null });
     }
 
     const tokenHash = hashToken(rawToken);
@@ -284,13 +284,13 @@ export const refresh = async (req, res, next) => {
 
     if (!session) {
       clearRefreshCookie(res);
-      return res.status(401).json({ error: "Authentication required" });
+      return res.status(200).json({ accessToken: null, user: null });
     }
 
     if (session.expiresAt < new Date()) {
       await Session.deleteOne({ _id: session._id });
       clearRefreshCookie(res);
-      return res.status(401).json({ error: "Authentication required" });
+      return res.status(200).json({ accessToken: null, user: null });
     }
 
     // Rotate: delete old session
@@ -301,7 +301,7 @@ export const refresh = async (req, res, next) => {
     const user = await User.findById(userId);
     if (!user) {
       clearRefreshCookie(res);
-      return res.status(401).json({ error: "Authentication required" });
+      return res.status(200).json({ accessToken: null, user: null });
     }
 
     // Create new session + issue new tokens
