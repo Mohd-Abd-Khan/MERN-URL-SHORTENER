@@ -2,6 +2,8 @@
 
 A full-stack, production-ready URL Shortener web application built with the **MERN** stack (**MongoDB, Express.js, React 19, Node.js**) and **Vite**. Features a complete JWT authentication flow with OTP email verification, refresh token rotation via HttpOnly cookies, Google OAuth 2.0 Gmail delivery, QR code generation, link analytics tracking, and a user dashboard.
 
+> 🎓 **Preparing for Technical Interviews?** Check out our dedicated [Technical Interview Preparation Guide](./INTERVIEW_PREP.md) containing system architecture diagrams, database schemas, security mechanics, top technical challenges, and 15 interviewer Q&A pairs.
+
 ---
 
 ## ✨ Features
@@ -80,27 +82,27 @@ A full-stack, production-ready URL Shortener web application built with the **ME
 │   │   │   ├── dashboardApi.js   # Dashboard API calls
 │   │   │   └── urlApi.js         # Shortener API calls
 │   │   ├── components/
-│   │   │   ├── Navbar.jsx        # Glassmorphic header navbar
-│   │   │   ├── ShortenForm.jsx   # URL input form
-│   │   │   └── ShortenResult.jsx # Short URL result display & QR download
+│   │   │   ├── Footer.jsx        # Developer portfolio footer
+│   │   │   └── Navbar.jsx        # Glassmorphic header navbar
 │   │   ├── context/
-│   │   │   └── AuthContext.jsx   # In-memory token & user state provider
+│   │   │   ├── AuthContextObject.js # Isolated Context instantiation
+│   │   │   ├── AuthContext.jsx   # In-memory token & user state provider
+│   │   │   └── useAuth.js        # Auth hook export
 │   │   ├── pages/
-│   │   │   ├── DashboardPage.jsx # Protected user links dashboard
-│   │   │   ├── HomePage.jsx      # Main URL shortener view
-│   │   │   ├── LoginPage.jsx     # User authentication page
-│   │   │   ├── RegisterPage.jsx  # Account creation page
+│   │   │   ├── LandingPage.jsx   # Public landing page
+│   │   │   ├── ShortenPage.jsx   # Protected URL shortener page
+│   │   │   ├── LoginPage.jsx     # Authentication login page
+│   │   │   ├── RegisterPage.jsx  # User registration page
 │   │   │   └── VerifyOtpPage.jsx # 6-digit OTP verification page
 │   │   ├── routes/
 │   │   │   └── ProtectedRoute.jsx # Client-side route guard
 │   │   ├── App.jsx               # App layout & routing structure
 │   │   ├── main.jsx              # Application root entry point
 │   │   └── index.css             # Tailwind v4 + DaisyUI entry
-│   ├── .env                      # Frontend environment variables
-│   ├── .env.example              # Frontend environment template
 │   ├── package.json
 │   └── vite.config.js
-└── README.md
+├── INTERVIEW_PREP.md             # Dedicated Technical Interview Preparation Guide
+└── README.md                     # Primary documentation
 ```
 
 ---
@@ -213,7 +215,7 @@ npm run dev
 ```
 > The Vite frontend app starts on `http://localhost:5173`.
 
-### 🧪 Testing the Complete Email Flow
+### 🧪 Testing the Complete Flow
 1. Open `http://localhost:5173` in your browser.
 2. Click **Register** in the top navigation bar.
 3. Enter your Name, Email, and Password, then click **Register**.
