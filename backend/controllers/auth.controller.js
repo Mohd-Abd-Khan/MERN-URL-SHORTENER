@@ -110,12 +110,10 @@ export const register = async (req, res, next) => {
       existingUser.name = name.trim();
       await existingUser.save();
 
-      try {
-        await sendOtpEmail(existingUser.email, otp, existingUser.name);
-        console.log(`📧 [Auth] OTP email dispatched successfully to: ${normalizedEmail}`);
-      } catch (mailErr) {
-        console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr);
-      }
+      // Dispatch OTP email in background
+      sendOtpEmail(existingUser.email, otp, existingUser.name)
+        .then(() => console.log(`📧 [Auth] OTP email dispatched successfully to: ${normalizedEmail}`))
+        .catch((mailErr) => console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr));
 
       return res.status(200).json({
         message: "If this email is valid, a verification code has been sent",
@@ -135,14 +133,12 @@ export const register = async (req, res, next) => {
       otpAttempts: 0,
     });
 
-    console.log(`✅ [Auth] New user created: ${normalizedEmail}`);
+    console.log(`✅ [Auth] New user created in database: ${normalizedEmail}`);
 
-    try {
-      await sendOtpEmail(user.email, otp, user.name);
-      console.log(`📧 [Auth] OTP email dispatched successfully to: ${normalizedEmail}`);
-    } catch (mailErr) {
-      console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr);
-    }
+    // Dispatch OTP email in background (non-blocking)
+    sendOtpEmail(user.email, otp, user.name)
+      .then(() => console.log(`📧 [Auth] OTP email dispatched successfully to: ${normalizedEmail}`))
+      .catch((mailErr) => console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr));
 
     return res.status(201).json({
       message: "If this email is valid, a verification code has been sent",
