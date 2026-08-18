@@ -1,5 +1,4 @@
 import nodemailer from "nodemailer";
-import { OAuth2Client } from "google-auth-library";
 
 let cachedEtherealTransporter = null;
 
@@ -45,7 +44,6 @@ const getTransporter = async () => {
   const {
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI,
     GOOGLE_REFRESH_TOKEN,
     GMAIL_USER,
     GMAIL_PASS,
@@ -56,36 +54,10 @@ const getTransporter = async () => {
     SMTP_FROM,
   } = process.env;
 
-  // 1. Google OAuth 2.0 Transport
+  // 1. Google OAuth 2.0 Transport — let Nodemailer manage token refresh natively
   if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
     try {
-      const redirectUri =
-        GOOGLE_REDIRECT_URI || "https://developers.google.com/oauthplayground";
-
-      const oauth2Client = new OAuth2Client(
-        GOOGLE_CLIENT_ID,
-        GOOGLE_CLIENT_SECRET,
-        redirectUri
-      );
-
-      oauth2Client.setCredentials({
-        refresh_token: GOOGLE_REFRESH_TOKEN,
-      });
-
-      // Obtain a valid access token with a 5-second timeout guard
-      const accessTokenPromise = oauth2Client.getAccessToken();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Google OAuth token request timed out (5s)")), 5000)
-      );
-
-      const accessTokenResponse = await Promise.race([accessTokenPromise, timeoutPromise]);
-      const accessToken = accessTokenResponse?.token;
-
-      if (!accessToken) {
-        throw new Error("Failed to retrieve Google OAuth 2.0 access token.");
-      }
-
-      // Extract raw email address from SMTP_FROM or fallback to SMTP_USER / GMAIL_USER
+      // Extract the authenticated sender email from SMTP_FROM env var
       let userEmail = GMAIL_USER || SMTP_USER || "";
       const rawFrom = SMTP_FROM || "";
       const match = rawFrom.match(/<([^>]+)>/);
@@ -95,6 +67,14 @@ const getTransporter = async () => {
         userEmail = rawFrom.trim();
       }
 
+      if (!userEmail) {
+        throw new Error(
+          "SMTP_FROM or GMAIL_USER must be set to the authenticated Gmail address."
+        );
+      }
+
+      // Nodemailer handles access-token acquisition and refresh internally
+      // when clientId, clientSecret, and refreshToken are provided.
       return nodemailer.createTransport({
         service: "gmail",
         auth: {
@@ -103,13 +83,12 @@ const getTransporter = async () => {
           clientId: GOOGLE_CLIENT_ID,
           clientSecret: GOOGLE_CLIENT_SECRET,
           refreshToken: GOOGLE_REFRESH_TOKEN,
-          accessToken: accessToken,
         },
       });
     } catch (err) {
       console.error(
         "❌ [Email] Google OAuth 2.0 Transport Failure:",
-        err.message || "Unable to authenticate with Google OAuth 2.0"
+        err.message || "Unable to configure Google OAuth 2.0 transport"
       );
       throw err;
     }
@@ -196,10 +175,10 @@ export const sendOtpEmail = async (to, otp, name) => {
       `,
     };
 
-    // Send email with a 10-second timeout
+    // Send email with a 30-second timeout (generous enough for cloud SMTP)
     const sendPromise = mailer.sendMail(mailOptions);
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Email dispatch timed out after 10s")), 10000)
+      setTimeout(() => reject(new Error("Email dispatch timed out after 30s")), 30000)
     );
 
     const info = await Promise.race([sendPromise, timeoutPromise]);

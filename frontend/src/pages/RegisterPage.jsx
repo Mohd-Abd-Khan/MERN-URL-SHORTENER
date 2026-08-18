@@ -42,9 +42,19 @@ const RegisterPage = () => {
       await register(name.trim(), email.trim(), password);
       navigate("/verify-otp", { state: { email: email.trim() } });
     } catch (err) {
-      setError(
-        err.response?.data?.error || "Registration failed. Please try again."
-      );
+      if (err.response?.status === 409) {
+        // Account already verified — redirect to login with context
+        navigate("/login", {
+          state: {
+            email: email.trim(),
+            message: err.response.data?.error,
+          },
+        });
+      } else {
+        setError(
+          err.response?.data?.error || "Registration failed. Please try again."
+        );
+      }
     } finally {
       setIsLoading(false);
     }

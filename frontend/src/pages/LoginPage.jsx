@@ -16,6 +16,7 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [infoMessage] = useState(location.state?.message || "");
   const [needsVerification, setNeedsVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -61,6 +62,12 @@ const LoginPage = () => {
               Sign in to access your shortened links dashboard
             </p>
           </div>
+
+          {infoMessage && (
+            <div className="alert alert-info text-sm mb-4 p-3 rounded-lg">
+              <span>{infoMessage}</span>
+            </div>
+          )}
 
           {error && (
             <div className="alert alert-error text-sm mb-4 flex flex-col items-start gap-1 p-3 rounded-lg">

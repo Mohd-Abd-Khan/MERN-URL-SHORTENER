@@ -92,10 +92,10 @@ export const register = async (req, res, next) => {
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       if (existingUser.isVerified) {
-        console.log(`ℹ️ [Auth] User already exists & verified: ${normalizedEmail}`);
+        console.log(`ℹ️ [Auth] Registration rejected: Email already verified: ${normalizedEmail}`);
         return res
-          .status(200)
-          .json({ message: "If this email is valid, a verification code has been sent" });
+          .status(409)
+          .json({ error: "An account with this email already exists. Please log in." });
       }
 
       // If unverified, regenerate OTP and resend
@@ -110,14 +110,15 @@ export const register = async (req, res, next) => {
       existingUser.name = name.trim();
       await existingUser.save();
 
-      // Dispatch OTP email in background
-      sendOtpEmail(existingUser.email, otp, existingUser.name)
-        .then(() => console.log(`📧 [Auth] OTP email dispatched successfully to: ${normalizedEmail}`))
-        .catch((mailErr) => console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr));
-
-      return res.status(200).json({
-        message: "If this email is valid, a verification code has been sent",
-      });
+      // Await email delivery — block response until we know if it succeeded
+      try {
+        await sendOtpEmail(existingUser.email, otp, existingUser.name);
+        console.log(`📧 [Auth] OTP email dispatched successfully to: ${normalizedEmail}`);
+        return res.status(200).json({ message: "Verification code sent to your email" });
+      } catch (mailErr) {
+        console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr);
+        return res.status(503).json({ error: "Unable to send verification email. Please try again." });
+      }
     }
 
     // Create new user
@@ -135,14 +136,15 @@ export const register = async (req, res, next) => {
 
     console.log(`✅ [Auth] New user created in database: ${normalizedEmail}`);
 
-    // Dispatch OTP email in background (non-blocking)
-    sendOtpEmail(user.email, otp, user.name)
-      .then(() => console.log(`📧 [Auth] OTP email dispatched successfully to: ${normalizedEmail}`))
-      .catch((mailErr) => console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr));
-
-    return res.status(201).json({
-      message: "If this email is valid, a verification code has been sent",
-    });
+    // Await email delivery — block response until we know if it succeeded
+    try {
+      await sendOtpEmail(user.email, otp, user.name);
+      console.log(`📧 [Auth] OTP email dispatched successfully to: ${normalizedEmail}`);
+      return res.status(201).json({ message: "Verification code sent to your email" });
+    } catch (mailErr) {
+      console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr);
+      return res.status(503).json({ error: "Unable to send verification email. Please try again." });
+    }
   } catch (error) {
     console.error("❌ [Auth] Registration Error:", error.message || error);
     next(error);
@@ -388,12 +390,15 @@ export const resendOtp = async (req, res, next) => {
     user.otpAttempts = 0;
     await user.save();
 
-    console.log(`📧 [Auth] Dispatching new OTP code to: ${normalizedEmail}`);
-    sendOtpEmail(user.email, otp, user.name)
-      .then(() => console.log(`📧 [Auth] Resent OTP email successfully to: ${normalizedEmail}`))
-      .catch((mailErr) => console.error(`❌ [Auth] Resend OTP email failed for ${normalizedEmail}:`, mailErr.message || mailErr));
-
-    return res.status(200).json({ message: "A new 6-digit verification code has been sent to your email" });
+    // Await email delivery — block response until we know if it succeeded
+    try {
+      await sendOtpEmail(user.email, otp, user.name);
+      console.log(`📧 [Auth] Resent OTP email successfully to: ${normalizedEmail}`);
+      return res.status(200).json({ message: "A new 6-digit verification code has been sent to your email" });
+    } catch (mailErr) {
+      console.error(`❌ [Auth] Resend OTP email failed for ${normalizedEmail}:`, mailErr.message || mailErr);
+      return res.status(503).json({ error: "Unable to send verification email. Please try again." });
+    }
   } catch (error) {
     console.error("❌ [Auth] Resend OTP Error:", error.message || error);
     next(error);
