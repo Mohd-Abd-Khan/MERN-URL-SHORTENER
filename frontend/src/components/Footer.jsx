@@ -58,7 +58,7 @@ const Footer = () => {
           <ul className="flex flex-col gap-2.5 text-sm text-base-content/70">
             <li>
               <a
-                href="https://github.com"
+                href="https://github.com/Mohd-Abd-Khan"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary transition-colors flex items-center gap-2"
@@ -80,7 +80,7 @@ const Footer = () => {
             </li>
             <li>
               <a
-                href="https://linkedin.com"
+                href="https://www.linkedin.com/in/mohd-abdullah-khan-18407537b/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary transition-colors flex items-center gap-2"
@@ -98,7 +98,7 @@ const Footer = () => {
             </li>
             <li>
               <a
-                href="https://github.com"
+                href="https://github.com/Mohd-Abd-Khan/MERN-URL-SHORTENER"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary transition-colors flex items-center gap-2"
@@ -125,7 +125,7 @@ const Footer = () => {
       </div>
 
       {/* Bottom Separator & Copyright Line */}
-      <div className="border-t border-base-300/40">
+      <div className="border-t border-white/5">
         <div className="max-w-7xl mx-auto px-6 sm:px-12 py-5 flex flex-col sm:flex-row justify-between items-center text-xs text-base-content/50 gap-2">
           <p>© 2026 -Mohd Abdullah Khan</p>
           <p>Designed and Developed by MAK</p>
