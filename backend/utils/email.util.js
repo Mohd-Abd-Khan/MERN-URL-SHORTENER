@@ -1,44 +1,66 @@
+import dns from "node:dns";
 import nodemailer from "nodemailer";
+
+// Force Node.js to prefer IPv4 over IPv6 in DNS lookups.
+// This prevents ENETUNREACH errors on cloud platforms like Render, AWS, etc.
+// where outbound IPv6 networking is disabled or unrouted.
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder("ipv4first");
+}
 
 /**
  * Validates and logs server startup SMTP environment readiness without exposing secrets.
  */
 export const validateEmailConfig = () => {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SERVICE } = process.env;
 
-  if (SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
-    console.log("📧 Email Service Mode: [Gmail SMTP]");
-    console.log(`📧 SMTP Host: ${SMTP_HOST}`);
-    console.log(`📧 SMTP Port: ${SMTP_PORT}`);
+  if (SMTP_USER && SMTP_PASS && (SMTP_HOST || SMTP_SERVICE)) {
+    console.log(`📧 Email Service Mode: [${SMTP_SERVICE || "SMTP"}]`);
+    console.log(`📧 SMTP Host: ${SMTP_HOST || (SMTP_SERVICE === "gmail" ? "Gmail Service" : "smtp.gmail.com")}`);
+    console.log(`📧 SMTP Port: ${SMTP_PORT || 587}`);
     console.log(`📧 SMTP User: ${SMTP_USER}`);
   } else {
     console.error("❌ SMTP email configuration is incomplete.");
-    console.error("   Required environment variables: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS");
+    console.error("   Required environment variables: SMTP_USER, SMTP_PASS, and (SMTP_HOST or SMTP_SERVICE)");
   }
 };
 
 /**
  * Creates and returns a configured Nodemailer SMTP transporter.
- * Uses STARTTLS on port 587 (or SSL on port 465).
+ * Supports standard SMTP (port 587 / 465) and built-in service mode (e.g. Gmail).
  */
 export const getTransporter = () => {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SERVICE } = process.env;
 
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
-    throw new Error("SMTP email configuration is incomplete");
+  if (!SMTP_USER || !SMTP_PASS) {
+    throw new Error("SMTP email configuration is incomplete. Missing SMTP_USER or SMTP_PASS.");
   }
 
   const port = Number(SMTP_PORT) || 587;
 
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port,
-    secure: port === 465,
+  // Base options with robust timeouts
+  const transportOptions = {
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS,
     },
-  });
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
+  };
+
+  if (SMTP_SERVICE) {
+    transportOptions.service = SMTP_SERVICE;
+  } else {
+    transportOptions.host = SMTP_HOST || "smtp.gmail.com";
+    transportOptions.port = port;
+    transportOptions.secure = port === 465;
+    transportOptions.tls = {
+      rejectUnauthorized: false,
+    };
+  }
+
+  return nodemailer.createTransport(transportOptions);
 };
 
 /**

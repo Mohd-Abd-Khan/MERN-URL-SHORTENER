@@ -1,3 +1,4 @@
+import dns from "node:dns";
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -8,6 +9,11 @@ import authRoutes from "./routes/auth.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import errorHandler from "./middleware/errorHandler.middleware.js";
 import { validateEmailConfig, verifySmtpConnection } from "./utils/email.util.js";
+
+// Force IPv4 DNS lookups first to prevent ENETUNREACH errors on cloud hosting (Render, AWS)
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder("ipv4first");
+}
 
 dotenv.config();
 
