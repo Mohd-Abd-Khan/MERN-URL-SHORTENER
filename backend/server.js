@@ -1,4 +1,3 @@
-import dns from "node:dns";
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -8,12 +7,7 @@ import urlRoutes from "./routes/url.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import errorHandler from "./middleware/errorHandler.middleware.js";
-import { validateEmailConfig, verifySmtpConnection } from "./utils/email.util.js";
-
-// Force IPv4 DNS lookups first to prevent ENETUNREACH errors on cloud hosting (Render, AWS)
-if (dns.setDefaultResultOrder) {
-  dns.setDefaultResultOrder("ipv4first");
-}
+import { validateEmailConfig } from "./utils/email.util.js";
 
 dotenv.config();
 
@@ -80,11 +74,10 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
-  app.listen(PORT, async () => {
+  app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🌐 Allowed CORS Origins:`, allowedOrigins);
     console.log(`🔗 Backend BASE_URL: ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
     validateEmailConfig();
-    await verifySmtpConnection();
   });
 });
