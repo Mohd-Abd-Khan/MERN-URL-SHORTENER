@@ -1,14 +1,14 @@
 # 📌 PROJECT CONTEXT & HANDOFF DOCUMENT: 04_URL_Shortener
 
-**Project Name:** 04_URL_Shortener (MERN Stack URL Shortener + Authentication Overhaul + Google OAuth 2.0 Gmail Migration)  
-**Date:** August 11, 2026  
+**Project Name:** 04_URL_Shortener (MERN Stack URL Shortener + Authentication + Gmail SMTP OTP Verification)  
+**Date:** August 19, 2026  
 **Status:** Completed
 
 ---
 
 ## 1. 🏗️ Overall Project Architecture
 
-This application is a full-stack MERN (MongoDB, Express, React, Node.js) web application designed for shortening URLs, generating QR codes, tracking link clicks, and supporting secure user accounts with full JWT authentication, OTP email verification via **Google OAuth 2.0 Gmail API**, and a user dashboard.
+This application is a full-stack MERN (MongoDB, Express, React, Node.js) web application designed for shortening URLs, generating QR codes, tracking link clicks, and supporting secure user accounts with full JWT authentication, OTP email verification via **Gmail SMTP with App Password**, and a user dashboard.
 
 ### Folder & Module Architecture
 
@@ -36,7 +36,7 @@ This application is a full-stack MERN (MongoDB, Express, React, Node.js) web app
 │   ├── utils/
 │   │   ├── token.util.js         # JWT access token & SHA-256 hash helpers
 │   │   ├── otp.util.js           # 6-digit OTP generator & SHA-256 hash helper
-│   │   └── email.util.js         # Google OAuth 2.0 Gmail transporter & HTML email template
+│   │   └── email.util.js         # Gmail SMTP transporter (STARTTLS port 587) & HTML email template
 │   ├── .env                      # Local environment configuration
 │   ├── .env.example              # Environment template
 │   ├── package.json
@@ -75,15 +75,16 @@ This application is a full-stack MERN (MongoDB, Express, React, Node.js) web app
 
 ---
 
-## 2. 📧 Google OAuth 2.0 Architecture Details
+## 2. 📧 Gmail SMTP Architecture Details
 
-1. **Library Selection**: Uses official `google-auth-library` (`OAuth2Client`) for retrieving fresh access tokens from the Google refresh token, combined with `nodemailer`'s native OAuth2 service transport.
-2. **Access Token Lifecycle**: Access tokens are requested dynamically on-demand server-side using the stored refresh token. Access and refresh tokens are **never** logged or sent to the frontend.
+1. **Transport**: Standard Nodemailer SMTP transport with STARTTLS over port 587 (`smtp.gmail.com`).
+2. **Authentication**: Dedicated 16-character Google App Password (2-Step Verification enabled on Gmail account).
 3. **Environment Configuration**:
-   - `GOOGLE_CLIENT_ID`
-   - `GOOGLE_CLIENT_SECRET`
-   - `GOOGLE_REDIRECT_URI` (defaults to `https://developers.google.com/oauthplayground`)
-   - `GOOGLE_REFRESH_TOKEN`
-   - `SMTP_FROM`
-4. **Scope**: Uses minimum required scope: `https://www.googleapis.com/auth/gmail.send`.
-5. **Development Fallback**: Automatically falls back to Ethereal test SMTP when Google OAuth credentials are absent, printing test preview URLs to the dev console.
+   - `SMTP_HOST=smtp.gmail.com`
+   - `SMTP_PORT=587`
+   - `SMTP_USER=myemail@gmail.com`
+   - `SMTP_PASS=my_16_character_gmail_app_password`
+   - `SMTP_FROM="URL Shortener <myemail@gmail.com>"`
+4. **Startup Verification**: `verifySmtpConnection()` runs during backend bootstrap to confirm SMTP connectivity and logs status safely without leaking credentials.
+5. **Direct Delivery**: Eliminates OAuth2 token timeouts and removes Ethereal test fallbacks in production. All OTP delivery errors return a safe 500 error to the frontend while logging real technical errors to server logs.
+

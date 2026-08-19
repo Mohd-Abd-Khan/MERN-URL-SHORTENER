@@ -1,163 +1,73 @@
 import nodemailer from "nodemailer";
 
-let cachedEtherealTransporter = null;
-
 /**
- * Validates and logs server startup email environment readiness without exposing secret keys.
+ * Validates and logs server startup SMTP environment readiness without exposing secrets.
  */
 export const validateEmailConfig = () => {
-  const {
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
-    GOOGLE_REFRESH_TOKEN,
-    GMAIL_USER,
-    GMAIL_PASS,
-    SMTP_HOST,
-    SMTP_USER,
-    SMTP_PASS,
-  } = process.env;
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
 
-  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
-    console.log("📧 Email Service Mode: [Google OAuth 2.0 / Gmail API]");
-  } else if (GMAIL_USER && GMAIL_PASS) {
-    console.log(`📧 Email Service Mode: [Gmail App Password for ${GMAIL_USER}]`);
-  } else if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
-    console.log(`📧 Email Service Mode: [Standard SMTP Host: ${SMTP_HOST}]`);
-  } else if (SMTP_USER && SMTP_PASS && SMTP_USER.includes("@gmail.com")) {
-    console.log(`📧 Email Service Mode: [Gmail App Password for ${SMTP_USER}]`);
+  if (SMTP_HOST && SMTP_PORT && SMTP_USER && SMTP_PASS) {
+    console.log("📧 Email Service Mode: [Gmail SMTP]");
+    console.log(`📧 SMTP Host: ${SMTP_HOST}`);
+    console.log(`📧 SMTP Port: ${SMTP_PORT}`);
+    console.log(`📧 SMTP User: ${SMTP_USER}`);
   } else {
-    console.warn("⚠️ [Email Service Warning] Production email credentials missing!");
-    console.warn("   Neither Google OAuth 2.0 nor Gmail App Password nor custom SMTP is configured on Render.");
-    console.warn("   Emails will fall back to Ethereal test SMTP (messages logged in console preview link).");
+    console.error("❌ SMTP email configuration is incomplete.");
+    console.error("   Required environment variables: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS");
   }
 };
 
 /**
- * Creates a reusable Nodemailer transporter.
- * Supports:
- * 1. Google OAuth 2.0 (Gmail API)
- * 2. Gmail App Passwords (GMAIL_USER / GMAIL_PASS or SMTP_USER / SMTP_PASS)
- * 3. Custom SMTP (SendGrid, Mailgun, AWS SES, Custom Host)
- * 4. Ethereal Test Account fallback
+ * Creates and returns a configured Nodemailer SMTP transporter.
+ * Uses STARTTLS on port 587 (or SSL on port 465).
  */
-const getTransporter = async () => {
-  const {
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
-    GOOGLE_REFRESH_TOKEN,
-    GMAIL_USER,
-    GMAIL_PASS,
-    SMTP_HOST,
-    SMTP_PORT,
-    SMTP_USER,
-    SMTP_PASS,
-    SMTP_FROM,
-  } = process.env;
+export const getTransporter = () => {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
 
-  // 1. Google OAuth 2.0 Transport — let Nodemailer manage token refresh natively
-  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
-    try {
-      // Extract the authenticated sender email from SMTP_FROM env var
-      let userEmail = GMAIL_USER || SMTP_USER || "";
-      const rawFrom = SMTP_FROM || "";
-      const match = rawFrom.match(/<([^>]+)>/);
-      if (match) {
-        userEmail = match[1];
-      } else if (rawFrom.includes("@")) {
-        userEmail = rawFrom.trim();
-      }
-
-      if (!userEmail) {
-        throw new Error(
-          "SMTP_FROM or GMAIL_USER must be set to the authenticated Gmail address."
-        );
-      }
-
-      // Nodemailer handles access-token acquisition and refresh internally
-      // when clientId, clientSecret, and refreshToken are provided.
-      return nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          type: "OAuth2",
-          user: userEmail,
-          clientId: GOOGLE_CLIENT_ID,
-          clientSecret: GOOGLE_CLIENT_SECRET,
-          refreshToken: GOOGLE_REFRESH_TOKEN,
-        },
-      });
-    } catch (err) {
-      console.error(
-        "❌ [Email] Google OAuth 2.0 Transport Failure:",
-        err.message || "Unable to configure Google OAuth 2.0 transport"
-      );
-      throw err;
-    }
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+    throw new Error("SMTP email configuration is incomplete");
   }
 
-  // 2. Direct Gmail App Password Transport
-  const targetGmailUser = GMAIL_USER || (SMTP_USER && SMTP_USER.includes("@gmail.com") ? SMTP_USER : null);
-  const targetGmailPass = GMAIL_PASS || (SMTP_PASS && !SMTP_HOST ? SMTP_PASS : null);
+  const port = Number(SMTP_PORT) || 587;
 
-  if (targetGmailUser && targetGmailPass) {
-    return nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: targetGmailUser,
-        pass: targetGmailPass,
-      },
-    });
-  }
-
-  // 3. Custom Standard SMTP Transport (SendGrid, Mailgun, AWS SES, etc.)
-  if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
-    return nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: parseInt(SMTP_PORT, 10) || 587,
-      secure: parseInt(SMTP_PORT, 10) === 465,
-      auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS,
-      },
-    });
-  }
-
-  // 4. Fallback: Ethereal test transporter
-  if (!cachedEtherealTransporter) {
-    try {
-      console.log("📧 Creating Ethereal test SMTP transporter fallback...");
-      const testAccount = await nodemailer.createTestAccount();
-      cachedEtherealTransporter = nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
-      console.log(`📧 Ethereal test SMTP initialized for user: ${testAccount.user}`);
-    } catch (etherealErr) {
-      console.warn("⚠️ Failed to create Ethereal test account:", etherealErr.message);
-      cachedEtherealTransporter = nodemailer.createTransport({
-        jsonTransport: true,
-      });
-    }
-  }
-
-  return cachedEtherealTransporter;
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port,
+    secure: port === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
 };
 
 /**
- * Sends a verification OTP email with a 10-second timeout guard.
+ * Verifies the SMTP connection on startup.
+ * Logs status clearly without crashing the server or exposing secrets.
+ */
+export const verifySmtpConnection = async () => {
+  try {
+    const transporter = getTransporter();
+    await transporter.verify();
+    console.log("📧 [Email] SMTP connection verified successfully");
+    return true;
+  } catch (error) {
+    console.error("❌ [Email] SMTP connection verification failed:", error.message || error);
+    return false;
+  }
+};
+
+/**
+ * Sends a verification OTP email using standard SMTP.
  * @param {string} to - Recipient email address
  * @param {string} otp - The 6-digit OTP (plaintext)
  * @param {string} name - User's name for personalization
  */
 export const sendOtpEmail = async (to, otp, name) => {
   try {
-    const mailer = await getTransporter();
+    const transporter = getTransporter();
 
-    const fromAddress = process.env.SMTP_FROM || process.env.GMAIL_USER || process.env.SMTP_USER || '"URL Shortener" <noreply@urlshortener.com>';
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER;
 
     const mailOptions = {
       from: fromAddress,
@@ -175,24 +85,12 @@ export const sendOtpEmail = async (to, otp, name) => {
       `,
     };
 
-    // Send email with a 30-second timeout (generous enough for cloud SMTP)
-    const sendPromise = mailer.sendMail(mailOptions);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Email dispatch timed out after 30s")), 30000)
-    );
-
-    const info = await Promise.race([sendPromise, timeoutPromise]);
-
-    if (!process.env.GOOGLE_CLIENT_ID && !process.env.GMAIL_PASS && info && typeof nodemailer.getTestMessageUrl === "function") {
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      if (previewUrl) {
-        console.log(`📧 Ethereal Preview URL: ${previewUrl}`);
-      }
-    }
-
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`📧 [Email] OTP email sent successfully to: ${to}`);
     return info;
   } catch (error) {
     console.error(`❌ [Email Dispatch Error] Failed sending OTP to ${to}:`, error.message || error);
     throw error;
   }
 };
+

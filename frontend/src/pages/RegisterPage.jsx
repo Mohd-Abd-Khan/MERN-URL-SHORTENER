@@ -42,19 +42,9 @@ const RegisterPage = () => {
       await register(name.trim(), email.trim(), password);
       navigate("/verify-otp", { state: { email: email.trim() } });
     } catch (err) {
-      if (err.response?.status === 409) {
-        // Account already verified — redirect to login with context
-        navigate("/login", {
-          state: {
-            email: email.trim(),
-            message: err.response.data?.error,
-          },
-        });
-      } else {
-        setError(
-          err.response?.data?.error || "Registration failed. Please try again."
-        );
-      }
+      setError(
+        err.response?.data?.error || "Registration failed. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -74,12 +64,25 @@ const RegisterPage = () => {
           </div>
 
           {error && (
-            <div className="alert alert-error text-sm mb-4 p-3 rounded-lg">
+            <div className="alert alert-error text-sm mb-4 flex flex-col items-start gap-1 p-3 rounded-lg">
               <span>{error}</span>
+              {(error.toLowerCase().includes("already exists") || error.toLowerCase().includes("already registered") || error.toLowerCase().includes("log in")) && (
+                <Link
+                  to="/login"
+                  state={{ email: email.trim() }}
+                  className="btn btn-xs btn-outline btn-ghost border-current mt-1"
+                >
+                  Go to Login →
+                </Link>
+              )}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full">
+          <form
+            onSubmit={handleSubmit}
+            autoComplete="off"
+            className="flex flex-col gap-4 w-full"
+          >
             {/* Full Name Field */}
             <div className="flex flex-col gap-1 w-full">
               <label htmlFor="register-name" className="text-xs font-semibold uppercase tracking-wider text-base-content/70">
@@ -99,7 +102,9 @@ const RegisterPage = () => {
                 </svg>
                 <input
                   id="register-name"
+                  name="new_user_fullname"
                   type="text"
+                  autoComplete="off"
                   className="w-full h-12 pl-10 pr-4 bg-base-100 border border-base-300 rounded-lg text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:bg-base-300/30"
                   placeholder="John Doe"
                   value={name}
@@ -129,7 +134,9 @@ const RegisterPage = () => {
                 </svg>
                 <input
                   id="register-email"
+                  name="new_user_email"
                   type="email"
+                  autoComplete="off"
                   className="w-full h-12 pl-10 pr-4 bg-base-100 border border-base-300 rounded-lg text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:bg-base-300/30"
                   placeholder="name@example.com"
                   value={email}
@@ -159,7 +166,9 @@ const RegisterPage = () => {
                 </svg>
                 <input
                   id="register-password"
+                  name="new_user_password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   className="w-full h-12 pl-10 pr-10 bg-base-100 border border-base-300 rounded-lg text-sm transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:bg-base-300/30"
                   placeholder="Min 8 characters"
                   value={password}

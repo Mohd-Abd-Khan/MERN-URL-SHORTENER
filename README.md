@@ -1,6 +1,6 @@
 # 🔗 Production-Grade MERN Stack URL Shortener & Authentication Platform
 
-A full-stack, production-ready URL Shortener web application built with the **MERN** stack (**MongoDB, Express.js, React 19, Node.js**) and **Vite**. Features a complete JWT authentication flow with OTP email verification, refresh token rotation via HttpOnly cookies, Google OAuth 2.0 Gmail delivery, QR code generation, link analytics tracking, and a user dashboard.
+A full-stack, production-ready URL Shortener web application built with the **MERN** stack (**MongoDB, Express.js, React 19, Node.js**) and **Vite**. Features a complete JWT authentication flow with OTP email verification via **Gmail SMTP (App Password)**, refresh token rotation via HttpOnly cookies, QR code generation, link analytics tracking, and a user dashboard.
 
 > 🎓 **Preparing for Technical Interviews?** Check out our dedicated [Technical Interview Preparation Guide](./INTERVIEW_PREP.md) containing system architecture diagrams, database schemas, security mechanics, top technical challenges, and 15 interviewer Q&A pairs.
 
@@ -12,7 +12,9 @@ A full-stack, production-ready URL Shortener web application built with the **ME
 - **Guest & Authenticated Shortening**: Guest users can shorten links instantly; authenticated users have their links automatically tied to their personal account.
 - **Secure Authentication & Registration**:
   - Email + Password registration with `bcrypt` (cost factor 12).
-  - 6-digit OTP verification via **Google OAuth 2.0 Gmail API** (with automatic Ethereal SMTP fallback in local development when OAuth credentials are absent).
+  - 6-digit OTP verification via **Gmail SMTP with Google App Password** (`smtp.gmail.com:587` with STARTTLS).
+  - Clean duplicate-account handling (direct inline alerts with quick login navigation).
+  - Browser autofill suppression on registration inputs (`autoComplete="off"`, `autoComplete="new-password"`).
   - Anti-brute-forcing OTP limit enforcement & 10-minute code expiry.
   - In-memory JWT access token (~15 min expiry) + HttpOnly, SameSite, Secure refresh token cookies.
   - Automatic silent refresh token rotation.
@@ -37,7 +39,7 @@ A full-stack, production-ready URL Shortener web application built with the **ME
 - **Framework**: [Express.js v5](https://expressjs.com/)
 - **Database**: [MongoDB](https://www.mongodb.com/) + [Mongoose](https://mongoosejs.com/)
 - **Security**: `bcrypt`, `jsonwebtoken`, `cookie-parser`, `cors`
-- **Email Delivery**: `google-auth-library` + `nodemailer` (Google OAuth 2.0 for Gmail)
+- **Email Delivery**: `nodemailer` (Standard Gmail SMTP with App Password)
 - **ID Generator**: `nanoid`
 
 ---
@@ -66,7 +68,7 @@ A full-stack, production-ready URL Shortener web application built with the **ME
 │   │   ├── dashboard.routes.js   # Dashboard endpoint router (/api/dashboard)
 │   │   └── url.routes.js         # URL endpoint router (/api/shortener & GET /:shortId)
 │   ├── utils/
-│   │   ├── email.util.js         # Google OAuth 2.0 Gmail transporter & HTML email templates
+│   │   ├── email.util.js         # Gmail SMTP transporter (STARTTLS 587) & HTML email templates
 │   │   ├── otp.util.js           # 6-digit randomInt OTP & SHA-256 hashing
 │   │   └── token.util.js         # JWT signing & token hashing helpers
 │   ├── .env                      # Local environment variables
@@ -83,14 +85,16 @@ A full-stack, production-ready URL Shortener web application built with the **ME
 │   │   │   └── urlApi.js         # Shortener API calls
 │   │   ├── components/
 │   │   │   ├── Footer.jsx        # Developer portfolio footer
-│   │   │   └── Navbar.jsx        # Glassmorphic header navbar
+│   │   │   ├── Navbar.jsx        # Glassmorphic header navbar
+│   │   │   ├── ShortenForm.jsx   # Input form for URL shortening
+│   │   │   └── ShortenResult.jsx # Display short link, copy button, QR code & download
 │   │   ├── context/
 │   │   │   ├── AuthContextObject.js # Isolated Context instantiation
 │   │   │   ├── AuthContext.jsx   # In-memory token & user state provider
 │   │   │   └── useAuth.js        # Auth hook export
 │   │   ├── pages/
 │   │   │   ├── LandingPage.jsx   # Public landing page
-│   │   │   ├── ShortenPage.jsx   # Protected URL shortener page
+│   │   │   ├── ShortenPage.jsx   # Protected URL shortener page & Dashboard
 │   │   │   ├── LoginPage.jsx     # Authentication login page
 │   │   │   ├── RegisterPage.jsx  # User registration page
 │   │   │   └── VerifyOtpPage.jsx # 6-digit OTP verification page
@@ -118,15 +122,15 @@ FRONTEND_URL=http://localhost:5173
 
 MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/url-shortener
 
-JWT_SECRET=your_jwt_secret_key_here
+JWT_SECRET=your_production_jwt_secret_key_here
 JWT_EXPIRES_IN=15m
 REFRESH_TOKEN_EXPIRES_DAYS=7
 
-# Google OAuth 2.0 Gmail Configuration
-GOOGLE_CLIENT_ID=your_google_client_id_here
-GOOGLE_CLIENT_SECRET=your_google_client_secret_here
-GOOGLE_REDIRECT_URI=https://developers.google.com/oauthplayground
-GOOGLE_REFRESH_TOKEN=your_google_refresh_token_here
+# Standard Gmail SMTP Configuration (Using Gmail App Password)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_gmail_address@gmail.com
+SMTP_PASS=your_16_character_gmail_app_password
 SMTP_FROM="URL Shortener <your_gmail_address@gmail.com>"
 ```
 
@@ -138,59 +142,28 @@ VITE_BACKEND_URL=http://localhost:5000
 
 ---
 
-## 🔑 Google OAuth 2.0 Setup Guide for Gmail
+## 🔑 Gmail App Password Setup Guide
 
-To enable real Gmail email delivery via Google OAuth 2.0, follow these steps:
+To enable reliable email delivery via Gmail SMTP, generate a 16-character Google App Password:
 
-### 1. Create a Google Cloud Project
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project (e.g., `URL Shortener Email`).
+### 1. Enable 2-Step Verification
+1. Go to your [Google Account Security](https://myaccount.google.com/security) settings.
+2. Under "How you sign in to Google", ensure **2-Step Verification** is turned **ON**.
 
-### 2. Enable the Gmail API
-1. In the Google Cloud Console, navigate to **APIs & Services > Library**.
-2. Search for **Gmail API** and click **Enable**.
+### 2. Generate an App Password
+1. In the search bar at the top of your Google Account page, search for **App passwords**.
+2. Enter an app name (e.g., `URL Shortener`).
+3. Click **Create**.
+4. Copy the generated **16-character password** (e.g., `abcd efgh ijkl mnop`).
 
-### 3. Configure the OAuth Consent Screen
-1. Go to **APIs & Services > OAuth consent screen**.
-2. Select **External** user type and click **Create**.
-3. Fill in the App Information (App name, User support email, Developer contact email).
-4. Under **Scopes**, add the minimum required scope:
-   `https://www.googleapis.com/auth/gmail.send`
-5. Under **Test Users**, add your Gmail address (the one sending the emails).
-
-### 4. Create OAuth 2.0 Credentials
-1. Go to **APIs & Services > Credentials**.
-2. Click **Create Credentials > OAuth client ID**.
-3. Select Application Type: **Web application**.
-4. Set Name: `URL Shortener Web Client`.
-5. Under **Authorized redirect URIs**, add:
-   `https://developers.google.com/oauthplayground`
-6. Click **Create** and save your **Client ID** and **Client Secret**.
-
-### 5. Obtain a Google Refresh Token
-1. Open the [Google OAuth 2.0 Playground](https://developers.google.com/oauthplayground).
-2. Click the gear icon ⚙️ in the top right corner:
-   - Check **Use your own OAuth credentials**.
-   - Paste your **OAuth Client ID** and **OAuth Client Secret**.
-3. In the left panel ("Step 1 Select & authorize APIs"):
-   - Scroll down to **Gmail API v1**.
-   - Select `https://www.googleapis.com/auth/gmail.send`.
-4. Click **Authorize APIs** and log in with your test Gmail account.
-5. In "Step 2 Exchange authorization code for tokens":
-   - Click **Exchange authorization code for tokens**.
-6. Copy the generated **Refresh token**.
-
-### 6. Set Environment Variables
-Add your values to `backend/.env`:
+### 3. Configure in Render or Local `.env`
 ```env
-GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your_client_secret
-GOOGLE_REDIRECT_URI=https://developers.google.com/oauthplayground
-GOOGLE_REFRESH_TOKEN=1//your_refresh_token
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_gmail_address@gmail.com
+SMTP_PASS=abcdefghijklmnop
 SMTP_FROM="URL Shortener <your_gmail_address@gmail.com>"
 ```
-
-> 💡 **Note**: If `GOOGLE_CLIENT_ID` / `GOOGLE_REFRESH_TOKEN` are omitted in local dev, the app automatically falls back to Ethereal test SMTP and logs preview links in the console.
 
 ---
 
@@ -204,7 +177,10 @@ cd backend
 npm install
 npm run dev
 ```
-> The backend server starts on `http://localhost:5000` and displays `Connected to MongoDB`.
+> The backend server starts on `http://localhost:5000` and displays:
+> - `Connected to MongoDB`
+> - `📧 Email Service Mode: [Gmail SMTP]`
+> - `📧 [Email] SMTP connection verified successfully`
 
 #### 2. Setup & Start Frontend
 In a second terminal window:
@@ -219,9 +195,36 @@ npm run dev
 1. Open `http://localhost:5173` in your browser.
 2. Click **Register** in the top navigation bar.
 3. Enter your Name, Email, and Password, then click **Register**.
-4. Check your inbox (or dev server logs if using Ethereal fallback) for the 6-digit OTP email sent via Google OAuth 2.0.
+4. Check your inbox for the 6-digit OTP verification email sent via Gmail SMTP.
 5. Enter the 6-digit code on the `/verify-otp` page to complete registration.
 6. Log in with your new credentials and access the protected **Dashboard**.
+
+---
+
+## ☁️ Deployment on Render
+
+### Backend Web Service
+1. **Build Command**: `npm install`
+2. **Start Command**: `npm start`
+3. **Environment Variables**:
+   - `PORT=10000`
+   - `BASE_URL=https://your-backend.onrender.com`
+   - `FRONTEND_URL=https://your-frontend.onrender.com`
+   - `MONGO_URI=mongodb+srv://...`
+   - `JWT_SECRET=...`
+   - `JWT_EXPIRES_IN=15m`
+   - `REFRESH_TOKEN_EXPIRES_DAYS=7`
+   - `SMTP_HOST=smtp.gmail.com`
+   - `SMTP_PORT=587`
+   - `SMTP_USER=your_gmail@gmail.com`
+   - `SMTP_PASS=your_16_char_app_password`
+   - `SMTP_FROM="URL Shortener <your_gmail@gmail.com>"`
+
+### Frontend Static Site
+1. **Build Command**: `npm install && npm run build`
+2. **Publish Directory**: `dist`
+3. **Environment Variables**:
+   - `VITE_BACKEND_URL=https://your-backend.onrender.com`
 
 ---
 
@@ -231,8 +234,9 @@ npm run dev
 
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
-| `POST` | `/api/auth/register` | Register user & dispatch 6-digit OTP email via Gmail OAuth2 | No |
+| `POST` | `/api/auth/register` | Register user & dispatch 6-digit OTP email via Gmail SMTP | No |
 | `POST` | `/api/auth/verify-otp` | Verify 6-digit OTP code & activate user | No |
+| `POST` | `/api/auth/resend-otp` | Resend 6-digit OTP code via Gmail SMTP | No |
 | `POST` | `/api/auth/login` | Authenticate user, return JWT & set HttpOnly refresh cookie | No |
 | `POST` | `/api/auth/refresh` | Rotate refresh token cookie & issue new JWT | Cookie |
 | `POST` | `/api/auth/logout` | Revoke session document & clear refresh cookie | Cookie |
@@ -256,3 +260,4 @@ npm run dev
 ## 📜 License
 
 This project is licensed under the [ISC License](LICENSE).
+

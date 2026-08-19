@@ -117,7 +117,7 @@ export const register = async (req, res, next) => {
         return res.status(200).json({ message: "Verification code sent to your email" });
       } catch (mailErr) {
         console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr);
-        return res.status(503).json({ error: "Unable to send verification email. Please try again." });
+        return res.status(500).json({ error: "Unable to send verification email. Please try again later." });
       }
     }
 
@@ -143,7 +143,7 @@ export const register = async (req, res, next) => {
       return res.status(201).json({ message: "Verification code sent to your email" });
     } catch (mailErr) {
       console.error(`❌ [Auth] Failed to send OTP email to ${normalizedEmail}:`, mailErr.message || mailErr);
-      return res.status(503).json({ error: "Unable to send verification email. Please try again." });
+      return res.status(500).json({ error: "Unable to send verification email. Please try again later." });
     }
   } catch (error) {
     console.error("❌ [Auth] Registration Error:", error.message || error);
@@ -397,7 +397,7 @@ export const resendOtp = async (req, res, next) => {
       return res.status(200).json({ message: "A new 6-digit verification code has been sent to your email" });
     } catch (mailErr) {
       console.error(`❌ [Auth] Resend OTP email failed for ${normalizedEmail}:`, mailErr.message || mailErr);
-      return res.status(503).json({ error: "Unable to send verification email. Please try again." });
+      return res.status(500).json({ error: "Unable to send verification email. Please try again later." });
     }
   } catch (error) {
     console.error("❌ [Auth] Resend OTP Error:", error.message || error);
